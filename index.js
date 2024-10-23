@@ -13,7 +13,7 @@ app.use(cors()); //middleware cho tất cả các request từ bên ngoài vào(
 app.use(helmet());
 
 const allowedOrigins = [
-    'https://easybadwork-fe.vercel.app',
+    'https://911-fe.vercel.app',
     'http://localhost:3000',
     'http://14.225.218.217:3000',
     
@@ -60,7 +60,7 @@ app.use(rootRoutes);
 
 
 app.get("/",(req,res)=>{
-    res.send("easy bad work - update order");
+    res.send("911");
 })
 
 
