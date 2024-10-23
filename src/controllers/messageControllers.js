@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import moment from 'moment';
+import axios from 'axios';
 import cron from 'node-cron';
 const prisma = new PrismaClient();
 
@@ -157,16 +158,34 @@ const getAllMessage = async (req, res) => {
   };
   const sendMessageToZalo = async (userId, messageData) => {
     const zaloApiUrl = 'https://openapi.zalo.me/v3.0/oa/message/promotion';
-  
+    
     try {
-      const response = await axios.post(zaloApiUrl, {
+      // Retrieve the access token from the database
+      const tokenRecord = await prisma.token.findFirst();
+  
+      if (!tokenRecord || !tokenRecord.access_token) {
+        throw new Error('Access token not found');
+      }
+  
+      const accessToken = tokenRecord.access_token;
+  
+      // Prepare the payload for the Zalo message
+      const payload = {
         recipient: { user_id: userId },
         message: messageData
+      };
+  
+      // Send the message to the Zalo API
+      const response = await axios.post(zaloApiUrl, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'access_token': accessToken // Include the access token in the headers
+        }
       });
   
       return response.data;
     } catch (error) {
-      console.error('Error sending message to Zalo:', error);
+      console.error('Error sending message to Zalo:', error.response ? error.response.data : error.message);
       throw error;
     }
   };
@@ -306,75 +325,119 @@ const updateMessage = async (req, res) => {
 
 
 
-cron.schedule('0 8 * * *', async () => {
-  console.log('Running the message send job at 8 AM...');
-
-  const messages = await getTodayPendingMessages();
-
-  if (messages.length === 0) {
-    console.log('No pending messages to send.');
-    return;
-  }
-
-  messages.map((message, index) => {
-    // Schedule each message with a 5-second delay between each message
-    setTimeout(async () => {
-      try {
-        const messageData = {
-          "attachment": {
-            "type": "template",
-            "payload": {
-              "template_type": "promotion",
-              "elements": [
-                {
-                  "attachment_id": "aERC3A0iYGgQxim8fYIK6fxzsXkaFfq7ZFRB3RCyZH6RyziRis3RNydebK3iSPCJX_cJ3k1nW1EQufjN_pUL1f6Ypq3rTef5nxp6H_HnXKFDiyD5y762HS-baqRpQe5FdA376lTfq1sRyPr8ypd74ecbaLyA-tGmuJ-97W",
-                  "type": "banner"
-                },
-                {
-                  "type": "header",
-                  "content": "💥💥Ưu đãi thành viên Platinum💥💥"
-                },
-                {
-                  "type": "text",
-                  "align": "left",
-                  "content": message.message  // Message content from the pending messages
-                },
-                {
-                  "type": "table",
-                  "content": [
+// cron.schedule('0 8 * * *', async () => {
+  cron.schedule('0 8 * * *', async () => {
+    console.log('Running the message send job at 16:55...');
+    
+    try {
+      // Fetch today's pending messages
+      const today = new Date();
+      
+      // Set the start and end of the day
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1); // Next day at 00:00
+  
+      // Fetch messages where time_send is today and status is 'Pending'
+      const messages = await prisma.message.findMany({
+        where: {
+          time_send: {
+            gte: startOfDay, // Greater than or equal to start of the day
+            lt: endOfDay     // Less than the start of the next day
+          },
+          status: 'Pending'
+        }
+      });
+  
+      // Ensure that messages are valid
+      if (!Array.isArray(messages) || messages.length === 0) {
+        console.log('No pending messages to send.');
+        return;
+      }
+  
+      console.log('Retrieved messages:', messages);
+  
+      // Process each message
+      messages.forEach((message, index) => {
+        // Ensure message is properly structured
+        if (!message || typeof message !== 'object') {
+          console.error('Invalid message structure:', message);
+          return;
+        }
+  
+        const { message_id, user_id, message: messageText } = message;
+  
+        // Check for required fields
+        if (!message_id || !user_id || !messageText) {
+          console.error('Message is missing required fields:', message);
+          return;
+        }
+  
+        // Schedule each message with a 5-second delay
+        setTimeout(async () => {
+          try {
+            const messageData = {
+              "attachment": {
+                "type": "template",
+                "payload": {
+                  "template_type": "promotion",
+                  "elements": [
                     {
-                      "value": "VC09279222",
-                      "key": "Voucher"
+                      "attachment_id": "aERC3A0iYGgQxim8fYIK6fxzsXkaFfq7ZFRB3RCyZH6RyziRis3RNydebK3iSPCJX_cJ3k1nW1EQufjN_pUL1f6Ypq3rTef5nxp6H_HnXKFDiyD5y762HS-baqRpQe5FdA376lTfq1sRyPr8ypd74ecbaLyA-tGmuJ-97W",
+                      "type": "banner"
                     },
                     {
-                      "value": "30/12/2023",
-                      "key": "Hạn sử dụng"
+                      "type": "header",
+                      "content": "💥💥Ưu đãi thành viên Platinum💥💥"
+                    },
+                    {
+                      "type": "text",
+                      "align": "left",
+                      "content": messageText  // Message content from the pending messages
+                    },
+                    {
+                      "type": "table",
+                      "content": [
+                        {
+                          "value": "VC09279222",
+                          "key": "Voucher"
+                        },
+                        {
+                          "value": "30/12/2023",
+                          "key": "Hạn sử dụng"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "align": "center",
+                      "content": "Áp dụng tất cả cửa hàng trên toàn quốc"
                     }
                   ]
-                },
-                {
-                  "type": "text",
-                  "align": "center",
-                  "content": "Áp dụng tất cả cửa hàng trên toàn quốc"
                 }
-              ]
-            }
+              }
+            };
+  
+            // Send the message to the user via Zalo API
+            await sendMessageToZalo(user_id, messageData);
+  
+            // Update the message status to 'sent'
+            await updateMessageStatus(message_id, 'Sent');
+            console.log(`Message ${message_id} sent successfully.`);
+  
+          } catch (error) {
+            console.error(`Failed to send message ${message_id}:`, error);
           }
-        };
-
-        // Send the message to the user via Zalo API
-        await sendMessageToZalo(message.user_id, messageData);
-
-        // Update the message status to 'sent'
-        await updateMessageStatus(message.message_id, 'Sent');
-        console.log(`Message ${message.message_id} sent successfully.`);
-
-      } catch (error) {
-        console.error(`Failed to send message ${message.message_id}:`, error);
-      }
-    }, index * 5000); // 5 seconds delay between each message
+        }, index * 5000); // 5 seconds delay between each message
+      });
+  
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
   });
-});
+  
+  
+  
+
 
 
 export { getAllMessage,createMessage,deleteMessage,updateMessage,getPendingMessage,getMessageById,getToDayMessage,getTodayPendingMessages };
