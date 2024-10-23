@@ -20,7 +20,7 @@ COPY . .
 RUN npm install
 
 #B5: expose port cho bên ngoài connect tới 
-EXPOSE 8081
+EXPOSE 8082
 
 #B6: start server trong image
 
