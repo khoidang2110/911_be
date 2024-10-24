@@ -1,9 +1,9 @@
 #B1: build môi trường nodejs trong docker
 
 #FROM node:lts-alpine as build-stage
-FROM node:20-alpine as build-stage
 
-#FROM node:20
+
+FROM node:20
 #B2: tạo folder BE
 
 WORKDIR /app
