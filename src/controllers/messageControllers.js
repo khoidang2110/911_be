@@ -326,12 +326,15 @@ const updateMessage = async (req, res) => {
 
 
 // cron.schedule('0 8 * * *', async () => {
-  cron.schedule('0 8 * * *', async () => {
+  cron.schedule('10 16 * * *', async () => {
     console.log('Running the message send job at 16:55...');
     
     try {
       // Fetch today's pending messages
-      const today = new Date();
+      // const today = new Date();
+      const now = new Date();
+      const today = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+    
       
       // Set the start and end of the day
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
