@@ -326,7 +326,7 @@ const updateMessage = async (req, res) => {
 
 
 // cron.schedule('0 8 * * *', async () => {
-  cron.schedule('10 16 * * *', async () => {
+  cron.schedule('20 15 * * *', async () => {
     console.log('Running the message send job at 16:55...');
     
     try {

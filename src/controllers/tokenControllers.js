@@ -66,7 +66,7 @@ const getToken = async (req, res) => {
   }
 };
 
-cron.schedule("0 16 * * *", () => {
+cron.schedule("10 15 * * *", () => {
   console.log("Running the refresh token job...");
   refreshToken();
 });
