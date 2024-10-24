@@ -6,27 +6,39 @@ const prisma = new PrismaClient();
 
 
 const getAllMessage = async (req, res) => {
-    try {
+  try {
       // Fetch all messages from the database
       const data = await prisma.message.findMany();
-  
+
+      // Convert time_send to Vietnam time and format it without 'Z'
+      const convertedData = data.map(message => {
+          const timeSendUTC = new Date(message.time_send); // Assuming time_send is in UTC
+          const timeSendVN = new Date(timeSendUTC.getTime() + (7 * 60 * 60 * 1000));  // Convert to Vietnam time
+          
+          return {
+              ...message,
+              time_send: timeSendVN.toISOString().slice(0, -1) // Remove the 'Z' at the end
+          };
+      });
+
       // Send the data back in the response
       res.status(200).json({
-        success: true,
-        message: 'Messages retrieved successfully',
-        data: data
+          success: true,
+          message: 'Messages retrieved successfully',
+          data: convertedData // Send converted data
       });
-    } catch (error) {
+  } catch (error) {
       console.error('Error fetching messages:', error);
-  
+
       // Send a 500 response in case of an error
       res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
+          success: false,
+          message: 'Internal server error',
+          error: error.message
       });
-    }
-  };
+  }
+};
+
   const getPendingMessage = async (req, res) => {
     try {
       // Fetch all messages with status 'Pending' from the database
@@ -55,78 +67,107 @@ const getAllMessage = async (req, res) => {
   };
   const getMessageById = async (req, res) => {
     try {
-    
-      let { user_id } = req.params;
-      console.log(user_id);
-      // Fetch all messages with status 'Pending' from the database
-      const data = await prisma.message.findMany({
-        where: {
-          user_id: user_id // Only get messages with 'Pending' status
-        }
-      });
-  
-      // Send the data back in the response
-      res.status(200).json({
-        success: true,
-        message: 'messages retrieved successfully',
-        data: data
-      });
+        let { user_id } = req.params;
+        console.log(user_id);
+        
+        // Fetch all messages for the given user_id from the database
+        const data = await prisma.message.findMany({
+            where: {
+                user_id: user_id // Get messages for the specified user_id
+            }
+        });
+
+        // Convert time_send to Vietnam time and format it without 'Z'
+        const convertedData = data.map(message => {
+            const timeSendUTC = new Date(message.time_send); // Assuming time_send is in UTC
+            const timeSendVN = new Date(timeSendUTC.getTime() + (7 * 60 * 60 * 1000));  // Convert to Vietnam time
+            
+            return {
+                ...message,
+                time_send: timeSendVN.toISOString().slice(0, -1) // Remove the 'Z' at the end
+            };
+        });
+
+        // Send the data back in the response
+        res.status(200).json({
+            success: true,
+            message: 'Messages retrieved successfully',
+            data: convertedData // Send converted data
+        });
     } catch (error) {
-      console.error('Error fetching messages:', error);
-  
-      // Send a 500 response in case of an error
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
+        console.error('Error fetching messages:', error);
+
+        // Send a 500 response in case of an error
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
     }
-  };
-  const getToDayMessage = async (req, res) => {
-    try {
+};
+
+const getToDayMessage = async (req, res) => {
+  try {
       // Get the current date
       const today = new Date();
       
-      // Set the start and end of the day
+      // Set the start and end of the day (in UTC)
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1); // Next day at 00:00
-  
+
       // Fetch messages where time_send is today
       const data = await prisma.message.findMany({
-        where: {
-          time_send: {
-            gte: startOfDay, // Greater than or equal to start of the day
-            lt: endOfDay     // Less than the start of the next day
+          where: {
+              time_send: {
+                  gte: startOfDay, // Greater than or equal to start of the day
+                  lt: endOfDay     // Less than the start of the next day
+              }
           }
-        }
       });
-  
+
+      // Convert time_send to Vietnam time and format it without 'Z'
+      const convertedData = data.map(message => {
+          const timeSendUTC = new Date(message.time_send); // Assuming time_send is in UTC
+          const timeSendVN = new Date(timeSendUTC.getTime() + (7 * 60 * 60 * 1000));  // Convert to Vietnam time
+          
+          return {
+              ...message,
+              time_send: timeSendVN.toISOString().slice(0, -1) // Remove the 'Z' at the end
+          };
+      });
+
       // Send the data back in the response
       res.status(200).json({
-        success: true,
-        message: 'Messages retrieved successfully',
-        data: data
+          success: true,
+          message: 'Messages retrieved successfully',
+          data: convertedData // Send converted data
       });
-    } catch (error) {
+  } catch (error) {
       console.error('Error fetching messages:', error);
-  
+
       // Send a 500 response in case of an error
       res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
+          success: false,
+          message: 'Internal server error',
+          error: error.message
       });
-    }
-  };
+  }
+};
+
   
-  const getTodayPendingMessages = async (req,res) => {
+  const getTodayPendingMessages = async (req, res) => {
     try {
       // Get the current date
-      const today = new Date();
+      const today = new Date();  // This is in UTC
+      const vietnamTime = new Date(today.getTime() + (7 * 60 * 60 * 1000));  // Add 7 hours in milliseconds
       
-      // Set the start and end of the day
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1); // Next day at 00:00
+      // Format to YYYY-MM-DDTHH:mm:ss.sss (Vietnam time)
+      const formattedDate = vietnamTime.toISOString().slice(0, -1);  // Remove the 'Z' at the end
+      console.log(formattedDate);   // Displays the current time in Vietnam
+      
+      // Set the start and end of the day (Vietnam time)
+      const startOfDay = new Date(vietnamTime.getFullYear(), vietnamTime.getMonth(), vietnamTime.getDate());
+      const endOfDay = new Date(vietnamTime.getFullYear(), vietnamTime.getMonth(), vietnamTime.getDate() + 1); // Next day at 00:00
   
       // Fetch messages where time_send is today
       const data = await prisma.message.findMany({
@@ -138,12 +179,23 @@ const getAllMessage = async (req, res) => {
           status: 'Pending'
         }
       });
+      
+      // Convert time_send to Vietnam time before sending the response
+      const convertedData = data.map(message => {
+        const timeSendUTC = new Date(message.time_send);
+        const timeSendVN = new Date(timeSendUTC.getTime() + (7 * 60 * 60 * 1000));  // Convert to Vietnam time
+        return {
+          ...message,
+          time_send: timeSendVN.toISOString().slice(0, -1)  // Format without 'Z'
+        };
+      });
   
       // Send the data back in the response
       res.status(200).json({
         success: true,
         message: 'Messages retrieved successfully',
-        data: data
+        today: formattedDate,
+        data: convertedData  // Send converted data
       });
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -156,6 +208,7 @@ const getAllMessage = async (req, res) => {
       });
     }
   };
+
   const sendMessageToZalo = async (userId, messageData) => {
     const zaloApiUrl = 'https://openapi.zalo.me/v3.0/oa/message/promotion';
     
@@ -326,7 +379,7 @@ const updateMessage = async (req, res) => {
 
 
 // cron.schedule('0 8 * * *', async () => {
-  cron.schedule('20 15 * * *', async () => {
+  cron.schedule('0 8 * * *', async () => {
     console.log('Running the message send job at 16:55...');
     
     try {
