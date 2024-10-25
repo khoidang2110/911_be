@@ -491,7 +491,11 @@ const updateMessage = async (req, res) => {
     }
   });
   
-  
+  // Tạo cron job chạy mỗi phút
+cron.schedule('* * * * *', () => {
+  const now = new Date();
+  console.log('Time now:', now.toLocaleString());
+});
   
 
 
