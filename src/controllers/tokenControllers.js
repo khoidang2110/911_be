@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import refreshZaloToken from "../config/refreshZaloToken.js";
 import cron from "node-cron";
-import moment from 'moment';
+
 const prisma = new PrismaClient();
 
 const refreshToken = async (req, res) => {
@@ -37,7 +37,7 @@ const refreshToken = async (req, res) => {
         access_token: refreshedData.access_token,
         refresh_token: refreshedData.refresh_token,
         expires_in: refreshedData.expires_in,
-        created_at: localTime,
+        created_at: localTime.toISOString()
       },
     });
 
@@ -46,7 +46,9 @@ const refreshToken = async (req, res) => {
       return res.status(200).json({
         success: true,
         message: "Token refreshed and saved successfully",
-        localTime: localTime.toISOString(), // Convert localTime to ISO string format
+       // localTime: localTime.toISOString(), // Convert localTime to ISO string format
+       localTime:  now.toLocaleString('vi-VN')
+
       });
     } else {
       console.log("Token refreshed successfully at", localTime.toISOString());

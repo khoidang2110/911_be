@@ -108,12 +108,17 @@ const getAllMessage = async (req, res) => {
 
 const getToDayMessage = async (req, res) => {
   try {
-      // Get the current date
-      const today = new Date();
-      
-      // Set the start and end of the day (in UTC)
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1); // Next day at 00:00
+    
+    const today = new Date();  // This is in UTC
+    const vietnamTime = new Date(today.getTime() + (7 * 60 * 60 * 1000));  // Add 7 hours in milliseconds
+    
+    // Format to YYYY-MM-DDTHH:mm:ss.sss (Vietnam time)
+    const formattedDate = vietnamTime.toISOString().slice(0, -1);  // Remove the 'Z' at the end
+    console.log(formattedDate);   // Displays the current time in Vietnam
+    
+    // Set the start and end of the day (Vietnam time)
+    const startOfDay = new Date(vietnamTime.getFullYear(), vietnamTime.getMonth(), vietnamTime.getDate());
+    const endOfDay = new Date(vietnamTime.getFullYear(), vietnamTime.getMonth(), vietnamTime.getDate() + 1); // Next day at 00:00
 
       // Fetch messages where time_send is today
       const data = await prisma.message.findMany({
@@ -379,7 +384,7 @@ const updateMessage = async (req, res) => {
 
 
 // cron.schedule('0 8 * * *', async () => {
-  cron.schedule('0 8 * * *', async () => {
+  cron.schedule('0 7 * * *', async () => {
     console.log('Running the message send job at 16:55...');
     
     try {
@@ -437,37 +442,18 @@ const updateMessage = async (req, res) => {
                 "payload": {
                   "template_type": "promotion",
                   "elements": [
-                    {
-                      "attachment_id": "aERC3A0iYGgQxim8fYIK6fxzsXkaFfq7ZFRB3RCyZH6RyziRis3RNydebK3iSPCJX_cJ3k1nW1EQufjN_pUL1f6Ypq3rTef5nxp6H_HnXKFDiyD5y762HS-baqRpQe5FdA376lTfq1sRyPr8ypd74ecbaLyA-tGmuJ-97W",
-                      "type": "banner"
-                    },
+                  
                     {
                       "type": "header",
-                      "content": "💥💥Ưu đãi thành viên Platinum💥💥"
+                      "content": "💥💥911 GARAGE💥💥"
                     },
                     {
                       "type": "text",
                       "align": "left",
                       "content": messageText  // Message content from the pending messages
-                    },
-                    {
-                      "type": "table",
-                      "content": [
-                        {
-                          "value": "VC09279222",
-                          "key": "Voucher"
-                        },
-                        {
-                          "value": "30/12/2023",
-                          "key": "Hạn sử dụng"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "align": "center",
-                      "content": "Áp dụng tất cả cửa hàng trên toàn quốc"
                     }
+                
+               
                   ]
                 }
               }
@@ -492,10 +478,10 @@ const updateMessage = async (req, res) => {
   });
   
   // Tạo cron job chạy mỗi phút
-  cron.schedule('* * * * *', () => {
-    const now = new Date();
-    console.log('Time now (Vietnamese):', now.toLocaleString('vi-VN'));
-  });
+  // cron.schedule('37 12 * * *', () => {
+  //   const now = new Date();
+  //   console.log('Time now (Vietnamese):', now.toLocaleString('vi-VN'));
+  // });
   
 
 
