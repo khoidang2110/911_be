@@ -261,7 +261,13 @@ const getToDayMessage = async (req, res) => {
   
       // Parse the date using moment with the correct format
       let formattedDate = moment.utc(time_send, 'DD/MM/YYYY');
+
+      const timePart = Date.now().toString().slice(-4); // Last 4 digits of current timestamp
+      const randomPart = Math.floor(Math.random() * 9000) + 1000; // 4 random digits
+      const combined = `${timePart}${randomPart}`; // 8-digit string
+      
   
+      
       // Check if the date is valid
       if (!formattedDate.isValid()) {
         throw new Error('Invalid date format. Expected format: DD/MM/YYYY');
@@ -269,6 +275,7 @@ const getToDayMessage = async (req, res) => {
   
       // Create the new message object with status and deleted fields
       let newDataMessage = {
+        message_id:parseInt(combined),
         user_id,
         time_send: formattedDate.toISOString(), // Save as timestamp
         message,
