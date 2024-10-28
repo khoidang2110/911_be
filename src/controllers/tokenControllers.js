@@ -72,7 +72,7 @@ const getToken = async (req, res) => {
       return null;
     }
 
-    console.log("Token:", token);
+    //console.log("Token:", token);
     return res.send(token);
   } catch (error) {
     console.error("Error retrieving token:", error);
