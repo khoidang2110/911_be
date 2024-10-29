@@ -161,6 +161,55 @@ const getToDayMessage = async (req, res) => {
 
 
 
+const getTomorrowMessage = async (req, res) => {
+  try {
+    // Lấy ngày mai tại Việt Nam (UTC+7)
+    const tomorrow = moment().tz('Asia/Ho_Chi_Minh').add(1, 'days');
+    console.log('tomorrow:', tomorrow.format()); // Log đối tượng Moment
+
+    // Tạo start và end của ngày mai
+    const startOfDay = tomorrow.clone().startOf('day'); // Bắt đầu ngày mai
+    const endOfDay = tomorrow.clone().endOf('day').add(7, 'hours'); // Kết thúc ngày mai cộng thêm 7 tiếng
+
+    console.log("start:", startOfDay.toISOString());
+    console.log("end:", endOfDay.toISOString());
+
+    // Truy vấn cơ sở dữ liệu để lấy các tin nhắn trong khoảng thời gian ngày mai
+    const data = await prisma.message.findMany({
+      where: {
+        time_send: {
+          gte: startOfDay.toDate(), // Chuyển đổi sang đối tượng Date
+          lte: endOfDay.toDate()      // Chuyển đổi sang đối tượng Date
+        },
+        status: 'Pending'
+      }
+    });
+
+    // Convert `time_send` to string without 'Z'
+    const convertedData = data.map(message => {
+      return {
+        ...message,
+        time_send: message.time_send.toISOString().slice(0, -1) // Remove 'Z'
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Messages retrieved successfully',
+      data: convertedData
+    });
+  } catch (error) {
+    console.error('Error fetching messages:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+
 
 
 
@@ -631,4 +680,4 @@ const updateMessageStatus = async (messageId, status) => {
 
 
 
-export { getAllMessage,createMessage,deleteMessage,updateMessage,getPendingMessage,getMessageById,getToDayMessage,getTodayPendingMessages };
+export { getAllMessage,createMessage,deleteMessage,updateMessage,getPendingMessage,getMessageById,getToDayMessage,getTodayPendingMessages,getTomorrowMessage };
