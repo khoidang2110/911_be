@@ -1,7 +1,8 @@
 import { PrismaClient } from "@prisma/client";
-import moment from 'moment';
+import moment from 'moment-timezone';
 import axios from 'axios';
 import cron from 'node-cron';
+
 const prisma = new PrismaClient();
 
 
@@ -80,11 +81,11 @@ const getAllMessage = async (req, res) => {
         // Convert time_send to Vietnam time and format it without 'Z'
         const convertedData = data.map(message => {
             const timeSendUTC = new Date(message.time_send); // Assuming time_send is in UTC
-            const timeSendVN = new Date(timeSendUTC.getTime() + (7 * 60 * 60 * 1000));  // Convert to Vietnam time
+      
             
             return {
                 ...message,
-                time_send: timeSendVN.toISOString().slice(0, -1) // Remove the 'Z' at the end
+                time_send: timeSendUTC.toISOString().slice(0, -1) // Remove the 'Z' at the end
             };
         });
 
@@ -106,153 +107,151 @@ const getAllMessage = async (req, res) => {
     }
 };
 
+
+
+
+
+
 const getToDayMessage = async (req, res) => {
   try {
-    
-    const today = new Date();  // This is in UTC
-    const vietnamTime = new Date(today.getTime() + (7 * 60 * 60 * 1000));  // Add 7 hours in milliseconds
-    
-    // Format to YYYY-MM-DDTHH:mm:ss.sss (Vietnam time)
-    const formattedDate = vietnamTime.toISOString().slice(0, -1);  // Remove the 'Z' at the end
-    console.log(formattedDate);   // Displays the current time in Vietnam
-    
-    // Set the start and end of the day (Vietnam time)
-    const startOfDay = new Date(vietnamTime.getFullYear(), vietnamTime.getMonth(), vietnamTime.getDate());
-    const endOfDay = new Date(vietnamTime.getFullYear(), vietnamTime.getMonth(), vietnamTime.getDate() + 1); // Next day at 00:00
+    // Lấy ngày hôm nay tại Việt Nam (UTC+7)
+    const today = moment().tz('Asia/Ho_Chi_Minh');
+    console.log('today:', today.format()); // Log đối tượng Moment
 
-      // Fetch messages where time_send is today
-      const data = await prisma.message.findMany({
-          where: {
-              time_send: {
-                  gte: startOfDay, // Greater than or equal to start of the day
-                  lt: endOfDay     // Less than the start of the next day
-              }
-          }
-      });
+    // Tạo start và end của ngày hôm nay
+    const startOfDay = today.clone().startOf('day'); // Bắt đầu ngày
+    const endOfDay = today.clone().endOf('day').add(7, 'hours'); // Kết thúc ngày cộng thêm 7 tiếng
 
-      // Convert time_send to Vietnam time and format it without 'Z'
-      const convertedData = data.map(message => {
-          const timeSendUTC = new Date(message.time_send); // Assuming time_send is in UTC
-          const timeSendVN = new Date(timeSendUTC.getTime() + (7 * 60 * 60 * 1000));  // Convert to Vietnam time
-          
-          return {
-              ...message,
-              time_send: timeSendVN.toISOString().slice(0, -1) // Remove the 'Z' at the end
-          };
-      });
+    console.log("start:", startOfDay.toISOString());
+    console.log("end:", endOfDay.toISOString());
 
-      // Send the data back in the response
-      res.status(200).json({
-          success: true,
-          message: 'Messages retrieved successfully',
-          data: convertedData // Send converted data
-      });
+    // Truy vấn cơ sở dữ liệu để lấy các tin nhắn trong khoảng thời gian ngày hôm nay
+    const data = await prisma.message.findMany({
+      where: {
+        time_send: {
+          gte: startOfDay, // Chuyển đổi sang đối tượng Date
+          lte: endOfDay      // Chuyển đổi sang đối tượng Date
+        }
+      }
+    });
+
+    // Convert `time_send` to string without 'Z'
+    const convertedData = data.map(message => {
+      return {
+        ...message,
+        time_send: message.time_send.toISOString().slice(0, -1) // Remove 'Z'
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Messages retrieved successfully',
+      data: convertedData
+    });
   } catch (error) {
-      console.error('Error fetching messages:', error);
+    console.error('Error fetching messages:', error);
 
-      // Send a 500 response in case of an error
-      res.status(500).json({
-          success: false,
-          message: 'Internal server error',
-          error: error.message
-      });
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
   }
 };
 
-  
-  const getTodayPendingMessages = async (req, res) => {
-    try {
-      // Get the current date
-      const today = new Date();  // This is in UTC
-      const vietnamTime = new Date(today.getTime() + (7 * 60 * 60 * 1000));  // Add 7 hours in milliseconds
-      
-      // Format to YYYY-MM-DDTHH:mm:ss.sss (Vietnam time)
-      const formattedDate = vietnamTime.toISOString().slice(0, -1);  // Remove the 'Z' at the end
-      console.log(formattedDate);   // Displays the current time in Vietnam
-      
-      // Set the start and end of the day (Vietnam time)
-      const startOfDay = new Date(vietnamTime.getFullYear(), vietnamTime.getMonth(), vietnamTime.getDate());
-      const endOfDay = new Date(vietnamTime.getFullYear(), vietnamTime.getMonth(), vietnamTime.getDate() + 1); // Next day at 00:00
-  
-      // Fetch messages where time_send is today
-      const data = await prisma.message.findMany({
-        where: {
-          time_send: {
-            gte: startOfDay, // Greater than or equal to start of the day
-            lt: endOfDay     // Less than the start of the next day
-          },
-          status: 'Pending'
-        }
-      });
-      
-      // Convert time_send to Vietnam time before sending the response
-      const convertedData = data.map(message => {
-        const timeSendUTC = new Date(message.time_send);
-        const timeSendVN = new Date(timeSendUTC.getTime() + (7 * 60 * 60 * 1000));  // Convert to Vietnam time
-        return {
-          ...message,
-          time_send: timeSendVN.toISOString().slice(0, -1)  // Format without 'Z'
-        };
-      });
-  
-      // Send the data back in the response
-      res.status(200).json({
-        success: true,
-        message: 'Messages retrieved successfully',
-        today: formattedDate,
-        data: convertedData  // Send converted data
-      });
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-  
-      // Send a 500 response in case of an error
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
-    }
-  };
 
-  const sendMessageToZalo = async (userId, messageData) => {
-    const zaloApiUrl = 'https://openapi.zalo.me/v3.0/oa/message/promotion';
+
+
+
+
+  
+const getTodayPendingMessages = async (req, res) => {
+  try {
     
-    try {
-      // Retrieve the access token from the database
-      const tokenRecord = await prisma.token.findFirst();
-  
-      if (!tokenRecord || !tokenRecord.access_token) {
-        throw new Error('Access token not found');
+    const today = moment().tz('Asia/Ho_Chi_Minh');
+    console.log('today:', today.format()); // Log đối tượng Moment
+
+    // Tạo start và end của ngày hôm nay
+    const startOfDay = today.clone().startOf('day'); // Bắt đầu ngày
+    const endOfDay = today.clone().endOf('day').add(7, 'hours'); // Kết thúc ngày cộng thêm 7 tiếng
+
+    console.log("start:", startOfDay.toISOString());
+    console.log("end:", endOfDay.toISOString());
+
+    // Fetch messages where time_send is today and status is 'Pending'
+    const data = await prisma.message.findMany({
+      where: {
+        time_send: {
+          gte: startOfDay, // Greater than or equal to start of the day
+          lte: endOfDay,   // Less than or equal to end of the day
+        },
+        status: 'Pending'
       }
-  
-      const accessToken = tokenRecord.access_token;
-  
-      // Prepare the payload for the Zalo message
-      const payload = {
-        recipient: { user_id: userId },
-        message: messageData
-      };
-  
-      // Send the message to the Zalo API
-      const response = await axios.post(zaloApiUrl, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-          'access_token': accessToken // Include the access token in the headers
-        }
-      });
-  
-      return response.data;
-    } catch (error) {
-      console.error('Error sending message to Zalo:', error.response ? error.response.data : error.message);
-      throw error;
-    }
-  };
-  const updateMessageStatus = async (messageId, status) => {
-    await prisma.message.update({
-      where: { message_id: messageId },
-      data: { status }
     });
-  };
+
+    // Convert time_send to Vietnam time before sending the response
+    const convertedData = data.map(message => {
+      return {
+        ...message,
+        time_send: message.time_send.toISOString().slice(0, -1) // Remove 'Z'
+      };
+    });
+
+    // Send the data back in the response
+    res.status(200).json({
+      success: true,
+      message: 'Messages retrieved successfully',
+      data: convertedData  // Send converted data
+    });
+  } catch (error) {
+    console.error('Error fetching messages:', error);
+
+    // Send a 500 response in case of an error
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+//promotion
+  // const sendMessageToZalo = async (userId, messageData) => {
+  //   const zaloApiUrl = 'https://openapi.zalo.me/v3.0/oa/message/promotion';
+    
+  //   try {
+  //     // Retrieve the access token from the database
+  //     const tokenRecord = await prisma.token.findFirst();
+  
+  //     if (!tokenRecord || !tokenRecord.access_token) {
+  //       throw new Error('Access token not found');
+  //     }
+  
+  //     const accessToken = tokenRecord.access_token;
+  
+  //     // Prepare the payload for the Zalo message
+  //     const payload = {
+  //       recipient: { user_id: userId },
+  //       message: messageData
+  //     };
+  
+  //     // Send the message to the Zalo API
+  //     const response = await axios.post(zaloApiUrl, payload, {
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         'access_token': accessToken // Include the access token in the headers
+  //       }
+  //     });
+  
+  //     return response.data;
+  //   } catch (error) {
+  //     console.error('Error sending message to Zalo:', error.response ? error.response.data : error.message);
+  //     throw error;
+  //   }
+  // };
+
+  //transaction 165d
+ 
   
 
   const createMessage = async (req, res) => {
@@ -391,98 +390,98 @@ const updateMessage = async (req, res) => {
 
 
 // cron.schedule('0 8 * * *', async () => {
-  cron.schedule('0 7 * * *', async () => {
-    console.log('Running the message send job at 16:55...');
+  // cron.schedule('0 7 * * *', async () => {
+  //   console.log('Running the message send job at 16:55...');
     
-    try {
-      // Fetch today's pending messages
-      // const today = new Date();
-      const now = new Date();
-      const today = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+  //   try {
+  //     // Fetch today's pending messages
+  //     // const today = new Date();
+  //     const now = new Date();
+  //     const today = new Date(now.getTime() + (7 * 60 * 60 * 1000));
     
       
-      // Set the start and end of the day
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1); // Next day at 00:00
+  //     // Set the start and end of the day
+  //     const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  //     const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1); // Next day at 00:00
   
-      // Fetch messages where time_send is today and status is 'Pending'
-      const messages = await prisma.message.findMany({
-        where: {
-          time_send: {
-            gte: startOfDay, // Greater than or equal to start of the day
-            lt: endOfDay     // Less than the start of the next day
-          },
-          status: 'Pending'
-        }
-      });
+  //     // Fetch messages where time_send is today and status is 'Pending'
+  //     const messages = await prisma.message.findMany({
+  //       where: {
+  //         time_send: {
+  //           gte: startOfDay, // Greater than or equal to start of the day
+  //           lt: endOfDay     // Less than the start of the next day
+  //         },
+  //         status: 'Pending'
+  //       }
+  //     });
   
-      // Ensure that messages are valid
-      if (!Array.isArray(messages) || messages.length === 0) {
-        console.log('No pending messages to send.');
-        return;
-      }
+  //     // Ensure that messages are valid
+  //     if (!Array.isArray(messages) || messages.length === 0) {
+  //       console.log('No pending messages to send.');
+  //       return;
+  //     }
   
-      console.log('Retrieved messages:', messages);
+  //     console.log('Retrieved messages:', messages);
   
-      // Process each message
-      messages.forEach((message, index) => {
-        // Ensure message is properly structured
-        if (!message || typeof message !== 'object') {
-          console.error('Invalid message structure:', message);
-          return;
-        }
+  //     // Process each message
+  //     messages.forEach((message, index) => {
+  //       // Ensure message is properly structured
+  //       if (!message || typeof message !== 'object') {
+  //         console.error('Invalid message structure:', message);
+  //         return;
+  //       }
   
-        const { message_id, user_id, message: messageText } = message;
+  //       const { message_id, user_id, message: messageText } = message;
   
-        // Check for required fields
-        if (!message_id || !user_id || !messageText) {
-          console.error('Message is missing required fields:', message);
-          return;
-        }
+  //       // Check for required fields
+  //       if (!message_id || !user_id || !messageText) {
+  //         console.error('Message is missing required fields:', message);
+  //         return;
+  //       }
   
-        // Schedule each message with a 5-second delay
-        setTimeout(async () => {
-          try {
-            const messageData = {
-              "attachment": {
-                "type": "template",
-                "payload": {
-                  "template_type": "promotion",
-                  "elements": [
+  //       // Schedule each message with a 5-second delay
+  //       setTimeout(async () => {
+  //         try {
+  //           const messageData = {
+  //             "attachment": {
+  //               "type": "template",
+  //               "payload": {
+  //                 "template_type": "promotion",
+  //                 "elements": [
                   
-                    {
-                      "type": "header",
-                      "content": "💥💥911 GARAGE💥💥"
-                    },
-                    {
-                      "type": "text",
-                      "align": "left",
-                      "content": messageText  // Message content from the pending messages
-                    }
+  //                   {
+  //                     "type": "header",
+  //                     "content": "💥💥911 GARAGE💥💥"
+  //                   },
+  //                   {
+  //                     "type": "text",
+  //                     "align": "left",
+  //                     "content": messageText  // Message content from the pending messages
+  //                   }
                 
                
-                  ]
-                }
-              }
-            };
+  //                 ]
+  //               }
+  //             }
+  //           };
   
-            // Send the message to the user via Zalo API
-            await sendMessageToZalo(user_id, messageData);
+  //           // Send the message to the user via Zalo API
+  //           await sendMessageToZalo(user_id, messageData);
   
-            // Update the message status to 'sent'
-            await updateMessageStatus(message_id, 'Sent');
-            console.log(`Message ${message_id} sent successfully.`);
+  //           // Update the message status to 'sent'
+  //           await updateMessageStatus(message_id, 'Sent');
+  //           console.log(`Message ${message_id} sent successfully.`);
   
-          } catch (error) {
-            console.error(`Failed to send message ${message_id}:`, error);
-          }
-        }, index * 5000); // 5 seconds delay between each message
-      });
+  //         } catch (error) {
+  //           console.error(`Failed to send message ${message_id}:`, error);
+  //         }
+  //       }, index * 5000); // 5 seconds delay between each message
+  //     });
   
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-    }
-  });
+  //   } catch (error) {
+  //     console.error('Error fetching messages:', error);
+  //   }
+  // });
   
   // Tạo cron job chạy mỗi phút
   // cron.schedule('37 12 * * *', () => {
@@ -490,6 +489,145 @@ const updateMessage = async (req, res) => {
   //   console.log('Time now (Vietnamese):', now.toLocaleString('vi-VN'));
   // });
   
+// Job to schedule message sending
+cron.schedule('0 7 * * *', async () => {
+  console.log('Running the message send job at 16:55...');
+  
+  try {
+    const today = moment().tz('Asia/Ho_Chi_Minh');
+    console.log('today:', today.format()); // Log đối tượng Moment
+
+    // Tạo start và end của ngày hôm nay
+    const startOfDay = today.clone().startOf('day'); // Bắt đầu ngày
+    const endOfDay = today.clone().endOf('day').add(7, 'hours'); // Kết thúc ngày cộng thêm 7 tiếng
+
+    console.log("start:", startOfDay.toISOString());
+    console.log("end:", endOfDay.toISOString());
+    // Fetch messages where time_send is today
+    const messages = await prisma.message.findMany({
+      where: {
+        time_send: {
+          gte: startOfDay, // Greater than or equal to start of the day
+          lt: endOfDay     // Less than the start of the next day
+        },
+        status: 'Pending'
+      }
+    });
+
+    if (!messages.length) {
+      console.log('No pending messages to send.');
+      return;
+    }
+
+    // Process each message
+    messages.forEach((message, index) => {
+      const { message_id, user_id, message: messageText } = message;
+
+      setTimeout(async () => {
+        try {
+          const messageData = {
+            "attachment": {
+              "type": "template",
+              "payload": {
+                "template_type": "transaction_order",
+                "language": "VI",
+                "elements": [
+                    {
+                        "image_url": "https://cover-talk.zadn.vn/f/5/7/9/2/a03b7aca5d7ca307e9c5ef2571e263a0.jpg",
+                        "type": "banner"
+                    },
+                      {
+                        "type": "header",
+                        "content": "911 GARAGE",
+                        "align": "left"
+                    },
+                    {
+                        "type": "table",
+                        "content": [
+                            {
+                                "value": user_id,
+                                "key":"Mã khách hàng"
+                            },
+                            {
+                              "value": messageText,
+                              "key":"ND:"
+                          },
+                        ]
+                    }
+                ]
+            }
+            }
+          };
+
+          // Send message to Zalo
+          const response = await sendMessageToZalo(user_id, messageData);
+          
+          // Check if the message was sent successfully
+          if (response.error === 0) {
+            // Update status to 'Sent'
+            await updateMessageStatus(message_id, 'Sent');
+            console.log(`Message ${message_id} sent successfully.`);
+          } else {
+            console.error(`Failed to send message ${message_id}: ${response.message}`);
+          }
+
+        } catch (error) {
+          console.error(`Failed to send message ${message_id}:`, error);
+        }
+      }, index * 5000); // 5 seconds delay between each message
+    });
+
+  } catch (error) {
+    console.error('Error fetching messages:', error);
+  }
+});
+
+// Function to send message to Zalo
+const sendMessageToZalo = async (userId, messageData) => {
+  const zaloApiUrl = 'https://openapi.zalo.me/v3.0/oa/message/transaction';
+  
+  try {
+    // Retrieve the access token from the database
+    const tokenRecord = await prisma.token.findFirst();
+
+    if (!tokenRecord || !tokenRecord.access_token) {
+      throw new Error('Access token not found');
+    }
+
+    const accessToken = tokenRecord.access_token;
+
+    // Prepare the payload for the Zalo message
+    const payload = {
+      recipient: { user_id: userId },
+      message: messageData
+    };
+
+    // Send the message to the Zalo API
+    const response = await axios.post(zaloApiUrl, payload, {
+      headers: {
+        'Content-Type': 'application/json',
+        'access_token': accessToken // Include the access token in the headers
+      }
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error('Error sending message to Zalo:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+};
+
+// Function to update message status
+const updateMessageStatus = async (messageId, status) => {
+  try {
+    await prisma.message.update({
+      where: { message_id: messageId },
+      data: { status }
+    });
+  } catch (error) {
+    console.error(`Failed to update status for message ${messageId}:`, error);
+  }
+};
 
 
 
